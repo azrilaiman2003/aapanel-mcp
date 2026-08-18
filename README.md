@@ -112,9 +112,10 @@ claude mcp add aapanel -- ssh root@server \
 
 Dual-era, on one endpoint. It speaks **2026-07-28** — stateless, per-request `_meta`,
 mandatory `server/discover`, `MCP-Protocol-Version` / `Mcp-Method` / `Mcp-Name` header
-validation with `-32020` on mismatch, `resultType` on every result — and also answers the
-older `initialize` handshake used by `2025-11-25` and earlier, including the GET SSE
-channel those clients expect. Whatever MCP client you already have will connect.
+validation with `-32020` on mismatch, `resultType` on every result, `ttlMs`/`cacheScope`
+cache hints on listing results — and also answers the older `initialize` handshake used by
+`2025-11-25` and earlier, including the GET SSE channel those clients expect. Whatever MCP
+client you already have will connect.
 
 `subscriptions/listen` is supported for `toolsListChanged`, so a client sees the tool list
 change when you adjust permissions without reconnecting.

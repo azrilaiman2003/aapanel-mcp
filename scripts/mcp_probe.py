@@ -132,8 +132,13 @@ def main():
     result.check('has instructions for the model', bool(info.get('instructions')))
 
     status, response = client.send(modern('tools/list', request_id=2))
-    tools = ((response or {}).get('result') or {}).get('tools') or []
+    listing = ((response or {}).get('result') or {})
+    tools = listing.get('tools') or []
     result.check('tools/list returns tools', bool(tools), '%d visible' % len(tools))
+    result.check('tools/list carries cache hints',
+                 isinstance(listing.get('ttlMs'), int)
+                 and listing.get('cacheScope') in ('public', 'private'),
+                 'ttlMs=%s cacheScope=%s' % (listing.get('ttlMs'), listing.get('cacheScope')))
     if tools:
         shapes = all(isinstance(tool.get('inputSchema'), dict) and tool.get('description')
                      for tool in tools)

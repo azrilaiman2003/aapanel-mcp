@@ -39,6 +39,12 @@ class DispatchTest(unittest.TestCase):
                          'aapanel-mcp')
         self.assertTrue(result['instructions'])
 
+    def test_discover_carries_cache_hints(self):
+        result = self.server.dispatch(request('server/discover'), self.modern)['result']
+        self.assertIsInstance(result['ttlMs'], int)
+        self.assertGreaterEqual(result['ttlMs'], 0)
+        self.assertEqual(result['cacheScope'], 'private')
+
     def test_modern_results_carry_result_type(self):
         result = self.server.dispatch(request('tools/list'), self.modern)['result']
         self.assertEqual(result['resultType'], 'complete')
@@ -102,6 +108,15 @@ class DispatchTest(unittest.TestCase):
         self.assertNotIn('site_create', names)     # write tier, off by default
         self.assertNotIn('site_delete', names)     # destructive tier, off by default
         self.assertNotIn('run_shell', names)       # shell tier, off by default
+
+    def test_tools_list_carries_cache_hints(self):
+        # 2026-07-28 requires both on every listing result, and a client that validates
+        # its schema drops the whole tool list when either is missing.
+        for ctx in (self.modern, self.legacy):
+            result = self.server.dispatch(request('tools/list'), ctx)['result']
+            self.assertIsInstance(result['ttlMs'], int)
+            self.assertGreaterEqual(result['ttlMs'], 0)
+            self.assertEqual(result['cacheScope'], 'private')
 
     def test_every_listed_tool_has_a_usable_schema(self):
         result = self.server.dispatch(request('tools/list'), self.modern)['result']

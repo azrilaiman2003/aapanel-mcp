@@ -6,7 +6,7 @@
   "checks": "/www/server/panel/plugin/aapanel_mcp",
   "author": "Azril Aiman",
   "home": "https://github.com/azrilaiman2003/aapanel-mcp",
-  "date": "2026-08-17",
+  "date": "2026-08-18",
   "type": "plugin",
   "display": 0,
   "default": false,

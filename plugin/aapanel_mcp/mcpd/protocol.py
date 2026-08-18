@@ -6,7 +6,8 @@ endpoint:
 
 * **Modern** (`2026-07-28`): stateless. Every request carries its protocol version,
   client identity and capabilities in `params._meta`; `server/discover` is mandatory;
-  results carry a `resultType`. There is no `initialize`, no session, no GET stream.
+  results carry a `resultType`, and listing results carry the `ttlMs`/`cacheScope` cache
+  hints. There is no `initialize`, no session, no GET stream.
 * **Legacy** (`2025-11-25` and earlier): an `initialize` handshake negotiates the
   version once, results have no `resultType`, and servers may hold a session.
 
@@ -40,6 +41,14 @@ CODE_METHOD_NOT_FOUND = -32601
 CODE_INTERNAL = -32603
 CODE_PARSE = -32700
 CODE_INVALID_REQUEST = -32600
+
+# Cache hints required on listing results by 2026-07-28. The tool list is `private`
+# because what it contains depends on this installation's enabled tiers and on which
+# panel features are present, so it must never be shared between clients. The short TTL
+# bounds how long a tier change made in the panel UI can linger for a client that is not
+# subscribed to `notifications/tools/list_changed`.
+LIST_CACHE_TTL_MS = 60000
+CACHE_SCOPE_PRIVATE = 'private'
 
 INSTRUCTIONS = """\
 This server controls a live aaPanel hosting server: websites, TLS certificates, \
@@ -193,6 +202,8 @@ class McpServer:
 
     def _discover(self, params, ctx):
         return {
+            'ttlMs': LIST_CACHE_TTL_MS,
+            'cacheScope': CACHE_SCOPE_PRIVATE,
             'supportedVersions': list(SUPPORTED_PROTOCOLS),
             'capabilities': self.capabilities(),
             'instructions': INSTRUCTIONS,
@@ -225,7 +236,11 @@ class McpServer:
         if self._tool_loader:
             self._tool_loader(self.registry, self.panel)
         config = self.config
-        return {'tools': [self._definition(tool, config) for tool in self.visible_tools(config)]}
+        return {
+            'ttlMs': LIST_CACHE_TTL_MS,
+            'cacheScope': CACHE_SCOPE_PRIVATE,
+            'tools': [self._definition(tool, config) for tool in self.visible_tools(config)],
+        }
 
     @staticmethod
     def _definition(tool, config):
