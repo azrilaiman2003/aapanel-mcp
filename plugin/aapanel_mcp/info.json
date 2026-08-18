@@ -1,0 +1,16 @@
+{
+  "title": "AI MCP Server",
+  "name": "aapanel_mcp",
+  "ps": "Model Context Protocol server for aaPanel. Lets an AI agent manage websites, SSL, databases, mail, FTP, cron, files, firewall, Docker and installed apps through a token-authenticated MCP endpoint. Ships read-only; write, destructive and shell tiers are opt-in.",
+  "versions": "1.0.0",
+  "checks": "/www/server/panel/plugin/aapanel_mcp",
+  "author": "Azril Aiman",
+  "home": "https://github.com/azrilaiman2003/aapanel-mcp",
+  "date": "2026-08-17",
+  "type": "plugin",
+  "display": 0,
+  "default": false,
+  "beta": false,
+  "free": true,
+  "not_substituted": ["data|d"]
+}

@@ -1,0 +1,30 @@
+#!/www/server/panel/pyenv/bin/python3
+# coding: utf-8
+"""stdio entry point for the aaPanel MCP server.
+
+Point an MCP client at this over SSH and you get the same tools as the HTTP endpoint
+without opening a port:
+
+    ssh root@server /www/server/panel/plugin/aapanel_mcp/bin/aapanel-mcp-stdio
+
+Protocol traffic is stdin/stdout only; diagnostics go to stderr.
+"""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from mcpd import app as mcp_app                      # noqa: E402
+from mcpd.stdio_transport import StdioTransport      # noqa: E402
+
+
+def main():
+    logger = mcp_app.Logger(stream=sys.stderr, level='warn')
+    _provider, server = mcp_app.build()
+    logger('start', 'stdio transport ready, %d tools' % len(server.registry))
+    return StdioTransport(server).run()
+
+
+if __name__ == '__main__':
+    sys.exit(main())

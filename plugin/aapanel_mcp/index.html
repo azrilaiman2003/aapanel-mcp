@@ -1,0 +1,833 @@
+<div class="bt-form" id="mcp-plugin">
+<style>
+/* Everything is scoped under #mcp-plugin so nothing leaks into the panel shell. */
+#mcp-plugin { --mcp-line:#e6e9ec; --mcp-ink:#20242a; --mcp-muted:#7a828c; --mcp-bg:#f7f8f9;
+              --mcp-ok:#20a53a; --mcp-off:#c9ced4; --mcp-warn:#e6a23c; --mcp-bad:#e74c3c;
+              --mcp-read:#5b7c99; --mcp-write:#e6a23c; --mcp-destructive:#e74c3c;
+              --mcp-shell:#8e44ad; --mcp-raw:#6c5ce7;
+              --mcp-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+#mcp-plugin .mcp-pane { display:none; }
+#mcp-plugin .mcp-pane.on { display:block; }
+#mcp-plugin .mcp-card { border:1px solid var(--mcp-line); border-radius:4px; margin-bottom:14px; background:#fff; }
+#mcp-plugin .mcp-card > h3 { margin:0; padding:10px 14px; border-bottom:1px solid var(--mcp-line);
+    font-size:13px; font-weight:600; color:var(--mcp-ink); background:var(--mcp-bg);
+    border-radius:4px 4px 0 0; display:flex; align-items:center; justify-content:space-between; }
+#mcp-plugin .mcp-card > h3 .mcp-sub { font-weight:400; color:var(--mcp-muted); font-size:12px; }
+#mcp-plugin .mcp-body { padding:14px; }
+#mcp-plugin .mcp-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+#mcp-plugin .mcp-row:last-child { margin-bottom:0; }
+#mcp-plugin .mcp-label { width:150px; flex:0 0 150px; color:var(--mcp-muted); font-size:12px; }
+#mcp-plugin .mcp-grow { flex:1 1 240px; min-width:200px; }
+#mcp-plugin input[type=text], #mcp-plugin input[type=number], #mcp-plugin select, #mcp-plugin textarea {
+    border:1px solid var(--mcp-line); border-radius:3px; padding:5px 8px; font-size:12px;
+    color:var(--mcp-ink); background:#fff; box-sizing:border-box; width:100%; }
+#mcp-plugin textarea { font-family:var(--mcp-mono); resize:vertical; min-height:60px; }
+#mcp-plugin input:focus, #mcp-plugin select:focus, #mcp-plugin textarea:focus {
+    outline:2px solid rgba(32,165,58,.35); outline-offset:1px; border-color:var(--mcp-ok); }
+#mcp-plugin .mcp-hint { color:var(--mcp-muted); font-size:12px; line-height:1.6; }
+#mcp-plugin .mcp-hint code { font-family:var(--mcp-mono); background:var(--mcp-bg); padding:1px 4px;
+    border-radius:2px; }
+
+/* State pill: one shape, three meanings. */
+#mcp-plugin .mcp-pill { display:inline-flex; align-items:center; gap:6px; font-size:12px;
+    padding:2px 9px; border-radius:11px; border:1px solid var(--mcp-line); background:#fff; }
+#mcp-plugin .mcp-dot { width:7px; height:7px; border-radius:50%; background:var(--mcp-off); }
+#mcp-plugin .mcp-pill.is-on .mcp-dot { background:var(--mcp-ok); }
+#mcp-plugin .mcp-pill.is-off .mcp-dot { background:var(--mcp-off); }
+#mcp-plugin .mcp-pill.is-bad .mcp-dot { background:var(--mcp-bad); }
+
+/* Signature: the exposure meter. Five segments, one per tier, lit when the tier is open. */
+#mcp-plugin .mcp-meter { display:flex; gap:3px; margin:2px 0 12px; }
+#mcp-plugin .mcp-seg { flex:1; border-radius:2px; padding:9px 10px 8px; background:#eef0f2;
+    border:1px solid transparent; transition:background .15s, border-color .15s; }
+#mcp-plugin .mcp-seg .mcp-seg-name { font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--mcp-muted); font-weight:600; }
+#mcp-plugin .mcp-seg .mcp-seg-state { font-size:12px; color:var(--mcp-muted); margin-top:2px; }
+#mcp-plugin .mcp-seg.lit { color:#fff; }
+#mcp-plugin .mcp-seg.lit .mcp-seg-name, #mcp-plugin .mcp-seg.lit .mcp-seg-state { color:#fff; }
+#mcp-plugin .mcp-seg.lit[data-tier=read] { background:var(--mcp-read); }
+#mcp-plugin .mcp-seg.lit[data-tier=write] { background:var(--mcp-write); }
+#mcp-plugin .mcp-seg.lit[data-tier=destructive] { background:var(--mcp-destructive); }
+#mcp-plugin .mcp-seg.lit[data-tier=shell] { background:var(--mcp-shell); }
+#mcp-plugin .mcp-seg.lit[data-tier=raw] { background:var(--mcp-raw); }
+#mcp-plugin .mcp-summary { font-size:13px; line-height:1.7; color:var(--mcp-ink); }
+#mcp-plugin .mcp-summary b { font-weight:600; }
+
+/* Tier badge, same colour language as the meter. */
+#mcp-plugin .mcp-tier { font-size:11px; padding:1px 7px; border-radius:9px; color:#fff; white-space:nowrap; }
+#mcp-plugin .mcp-tier[data-tier=read] { background:var(--mcp-read); }
+#mcp-plugin .mcp-tier[data-tier=write] { background:var(--mcp-write); }
+#mcp-plugin .mcp-tier[data-tier=destructive] { background:var(--mcp-destructive); }
+#mcp-plugin .mcp-tier[data-tier=shell] { background:var(--mcp-shell); }
+#mcp-plugin .mcp-tier[data-tier=raw] { background:var(--mcp-raw); }
+
+#mcp-plugin .mcp-copy { display:flex; gap:6px; align-items:stretch; margin-bottom:8px; }
+#mcp-plugin .mcp-copy pre { flex:1; margin:0; padding:8px 10px; background:#1f2429; color:#e8eaed;
+    border-radius:3px; font-family:var(--mcp-mono); font-size:12px; line-height:1.5;
+    white-space:pre-wrap; word-break:break-all; max-height:150px; overflow:auto; }
+#mcp-plugin .mcp-copy button { flex:0 0 62px; }
+
+#mcp-plugin table.mcp-table { width:100%; border-collapse:collapse; font-size:12px; }
+#mcp-plugin table.mcp-table th { text-align:left; font-weight:600; color:var(--mcp-muted);
+    border-bottom:1px solid var(--mcp-line); padding:7px 8px; font-size:11px;
+    text-transform:uppercase; letter-spacing:.05em; }
+#mcp-plugin table.mcp-table td { border-bottom:1px solid #f1f3f4; padding:6px 8px;
+    vertical-align:middle; color:var(--mcp-ink); }
+#mcp-plugin table.mcp-table tr:hover td { background:#fafbfc; }
+#mcp-plugin table.mcp-table td.mcp-mono { font-family:var(--mcp-mono); }
+#mcp-plugin .mcp-domain td { background:var(--mcp-bg); font-weight:600; color:var(--mcp-ink);
+    text-transform:capitalize; }
+#mcp-plugin .mcp-desc { color:var(--mcp-muted); }
+#mcp-plugin .mcp-scroll { max-height:460px; overflow:auto; border:1px solid var(--mcp-line);
+    border-radius:3px; }
+#mcp-plugin pre.mcp-log { margin:0; padding:12px; background:#1f2429; color:#e8eaed; font-size:12px;
+    font-family:var(--mcp-mono); line-height:1.55; max-height:460px; overflow:auto;
+    white-space:pre-wrap; word-break:break-word; border-radius:3px; }
+#mcp-plugin .mcp-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+#mcp-plugin .mcp-banner { padding:9px 12px; border-radius:3px; font-size:12px; line-height:1.6;
+    margin-bottom:12px; border:1px solid; }
+#mcp-plugin .mcp-banner.warn { background:#fdf6ec; border-color:#f5dab1; color:#8a5d00; }
+#mcp-plugin .mcp-banner.bad { background:#fef0f0; border-color:#fbc4c4; color:#a33; }
+#mcp-plugin .mcp-banner.ok { background:#f0f9eb; border-color:#c2e7b0; color:#3c7d24; }
+#mcp-plugin .mcp-switch { display:inline-flex; align-items:center; gap:7px; cursor:pointer;
+    user-select:none; font-size:12px; }
+#mcp-plugin .mcp-switch input { margin:0; }
+#mcp-plugin .mcp-empty { padding:26px 14px; text-align:center; color:var(--mcp-muted); font-size:12px; }
+@media (max-width:900px) {
+  #mcp-plugin .mcp-meter { flex-wrap:wrap; }
+  #mcp-plugin .mcp-seg { flex:1 1 30%; }
+  #mcp-plugin .mcp-label { flex-basis:100%; width:auto; }
+}
+</style>
+
+<div class="bt-w-main">
+  <div class="bt-w-menu">
+    <p class="bgw" data-tab="overview">Overview</p>
+    <p data-tab="access">Access</p>
+    <p data-tab="permissions">Permissions</p>
+    <p data-tab="audit">Audit log</p>
+    <p data-tab="logs">Server log</p>
+  </div>
+
+  <div class="bt-w-con pd15">
+
+    <!-- ============================ OVERVIEW ============================ -->
+    <div class="mcp-pane on" id="mcp-pane-overview">
+      <div id="mcp-panel-banner"></div>
+
+      <div class="mcp-card">
+        <h3>MCP server
+          <span class="mcp-sub" id="mcp-version"></span>
+        </h3>
+        <div class="mcp-body">
+          <div class="mcp-row">
+            <span class="mcp-pill" id="mcp-service-pill"><span class="mcp-dot"></span><span id="mcp-service-text">Checking…</span></span>
+            <span class="mcp-hint" id="mcp-service-detail"></span>
+            <span class="mcp-grow"></span>
+            <div class="mcp-actions">
+              <button class="btn btn-success btn-sm" id="mcp-start">Start</button>
+              <button class="btn btn-default btn-sm" id="mcp-restart">Restart</button>
+              <button class="btn btn-default btn-sm" id="mcp-stop">Stop</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mcp-card">
+        <h3>What an agent can do right now
+          <span class="mcp-sub"><a href="javascript:;" class="mcp-goto" data-tab="permissions">Change this</a></span>
+        </h3>
+        <div class="mcp-body">
+          <div class="mcp-meter" id="mcp-meter"></div>
+          <p class="mcp-summary" id="mcp-summary"></p>
+        </div>
+      </div>
+
+      <div class="mcp-card">
+        <h3>Connect a client
+          <span class="mcp-sub" id="mcp-endpoint-label"></span>
+        </h3>
+        <div class="mcp-body">
+          <div class="mcp-row">
+            <span class="mcp-label">Access token</span>
+            <div class="mcp-grow"><input type="text" id="mcp-token" readonly value="••••••••"></div>
+            <button class="btn btn-default btn-sm" id="mcp-reveal">Show</button>
+            <button class="btn btn-default btn-sm" id="mcp-copy-token">Copy</button>
+          </div>
+          <p class="mcp-hint" style="margin:4px 0 12px">Anyone holding this token has whatever access the tiers above allow. Treat it like a root password.</p>
+
+          <div id="mcp-snippets"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================= ACCESS ============================= -->
+    <div class="mcp-pane" id="mcp-pane-access">
+      <div class="mcp-card">
+        <h3>Where the endpoint listens</h3>
+        <div class="mcp-body">
+          <div class="mcp-row">
+            <span class="mcp-label">Reachable from</span>
+            <div class="mcp-grow">
+              <select id="mcp-bind-mode">
+                <option value="localhost">This server only — reach it over an SSH tunnel</option>
+                <option value="bound">A network port on this server</option>
+                <option value="proxy">A domain, proxied by an aaPanel site</option>
+              </select>
+            </div>
+          </div>
+          <p class="mcp-hint" id="mcp-bind-help"></p>
+
+          <div class="mcp-row" id="mcp-row-host">
+            <span class="mcp-label">Listen address</span>
+            <div class="mcp-grow"><input type="text" id="mcp-host" placeholder="0.0.0.0"></div>
+          </div>
+          <div class="mcp-row">
+            <span class="mcp-label">Port</span>
+            <div class="mcp-grow"><input type="number" id="mcp-port" min="1" max="65535"></div>
+          </div>
+          <div class="mcp-row">
+            <span class="mcp-label">Endpoint path</span>
+            <div class="mcp-grow"><input type="text" id="mcp-path" placeholder="/mcp"></div>
+          </div>
+          <div class="mcp-row" id="mcp-row-tls">
+            <span class="mcp-label">Certificate</span>
+            <div class="mcp-grow">
+              <select id="mcp-tls-mode">
+                <option value="off">None — plain HTTP</option>
+                <option value="self_signed">Self-signed, generated here</option>
+                <option value="panel">The panel's own certificate</option>
+                <option value="custom">A certificate file on this server</option>
+              </select>
+            </div>
+          </div>
+          <div class="mcp-row mcp-tls-custom">
+            <span class="mcp-label">Certificate file</span>
+            <div class="mcp-grow"><input type="text" id="mcp-tls-cert" placeholder="/www/server/panel/vhost/cert/example.com/fullchain.pem"></div>
+          </div>
+          <div class="mcp-row mcp-tls-custom">
+            <span class="mcp-label">Key file</span>
+            <div class="mcp-grow"><input type="text" id="mcp-tls-key" placeholder="/www/server/panel/vhost/cert/example.com/privkey.pem"></div>
+          </div>
+          <div class="mcp-row" id="mcp-row-proxy">
+            <span class="mcp-label">Domain</span>
+            <div class="mcp-grow"><input type="text" id="mcp-proxy-domain" placeholder="mcp.example.com"></div>
+            <button class="btn btn-default btn-sm" id="mcp-setup-proxy">Create the site</button>
+          </div>
+          <p class="mcp-hint mcp-tls-custom">Point these at files that already exist on this server. The panel keeps issued certificates under <code>/www/server/panel/vhost/cert/&lt;domain&gt;/</code>.</p>
+        </div>
+      </div>
+
+      <div class="mcp-card">
+        <h3>Who may connect</h3>
+        <div class="mcp-body">
+          <div class="mcp-row">
+            <span class="mcp-label">Allowed addresses</span>
+            <div class="mcp-grow"><textarea id="mcp-ip-allow" placeholder="One address per line. Empty means any address that can reach the port."></textarea></div>
+          </div>
+          <div class="mcp-row">
+            <span class="mcp-label">Allowed browser origins</span>
+            <div class="mcp-grow"><textarea id="mcp-origin-allow" placeholder="One origin per line, e.g. https://claude.ai. Empty rejects every request that carries an Origin header."></textarea></div>
+          </div>
+          <p class="mcp-hint">MCP clients are not browsers and send no <code>Origin</code>, so leaving this empty is the safe default: it blocks a web page from reaching this endpoint through your browser.</p>
+          <div class="mcp-row">
+            <span class="mcp-label">Requests per minute</span>
+            <div class="mcp-grow" style="max-width:160px"><input type="number" id="mcp-rate" min="0"></div>
+            <span class="mcp-hint">Per client address. 0 turns the limit off.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mcp-card">
+        <h3>Firewall and token</h3>
+        <div class="mcp-body">
+          <div class="mcp-actions">
+            <button class="btn btn-default btn-sm" id="mcp-open-fw">Open the port in the firewall</button>
+            <button class="btn btn-default btn-sm" id="mcp-close-fw">Close it again</button>
+            <button class="btn btn-default btn-sm" id="mcp-new-token">Generate a new token</button>
+          </div>
+          <p class="mcp-hint" style="margin-top:8px">A new token disconnects every client using the old one.</p>
+        </div>
+      </div>
+
+      <div class="mcp-actions" style="margin-bottom:14px">
+        <button class="btn btn-success btn-sm" id="mcp-save-access">Save and restart</button>
+        <span class="mcp-hint" id="mcp-save-note"></span>
+      </div>
+    </div>
+
+    <!-- ========================== PERMISSIONS ========================== -->
+    <div class="mcp-pane" id="mcp-pane-permissions">
+      <div class="mcp-card">
+        <h3>Tiers</h3>
+        <div class="mcp-body">
+          <div class="mcp-actions" style="margin-bottom:12px">
+            <button class="btn btn-default btn-sm mcp-preset" data-preset="read_only">Read only</button>
+            <button class="btn btn-default btn-sm mcp-preset" data-preset="manage">Manage everything except shell</button>
+            <button class="btn btn-default btn-sm mcp-preset" data-preset="full">Everything</button>
+          </div>
+          <div id="mcp-tiers"></div>
+          <p class="mcp-hint" style="margin-top:10px">A disabled tool is not listed to the agent at all, so it cannot ask for a capability it never saw. Tools in the destructive and shell tiers also refuse their first call and hand back a confirmation token, which the agent must show you before repeating the call.</p>
+        </div>
+      </div>
+
+      <div class="mcp-card">
+        <h3>Tools
+          <span class="mcp-sub"><input type="text" id="mcp-tool-search" placeholder="Filter by name" style="width:180px"></span>
+        </h3>
+        <div class="mcp-body" style="padding:0">
+          <div class="mcp-scroll">
+            <table class="mcp-table" id="mcp-tools">
+              <thead><tr><th style="width:210px">Tool</th><th>What it does</th><th style="width:95px">Tier</th><th style="width:120px">Availability</th></tr></thead>
+              <tbody><tr><td colspan="4" class="mcp-empty">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================= AUDIT ============================= -->
+    <div class="mcp-pane" id="mcp-pane-audit">
+      <div class="mcp-card">
+        <h3>Every tool call, as it happened
+          <span class="mcp-sub">
+            <input type="text" id="mcp-audit-search" placeholder="Filter" style="width:150px">
+            <button class="btn btn-default btn-sm" id="mcp-audit-refresh">Refresh</button>
+            <button class="btn btn-default btn-sm" id="mcp-audit-clear">Clear</button>
+          </span>
+        </h3>
+        <div class="mcp-body" style="padding:0">
+          <div class="mcp-scroll">
+            <table class="mcp-table" id="mcp-audit">
+              <thead><tr><th style="width:145px">Time</th><th style="width:180px">Tool</th><th style="width:90px">Tier</th><th style="width:120px">Outcome</th><th>Arguments</th><th style="width:135px">Client</th></tr></thead>
+              <tbody><tr><td colspan="6" class="mcp-empty">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <p class="mcp-hint">Passwords, keys and tokens are replaced with <code>***</code> before anything is written here.</p>
+    </div>
+
+    <!-- ============================== LOGS ============================== -->
+    <div class="mcp-pane" id="mcp-pane-logs">
+      <div class="mcp-card">
+        <h3>Server log
+          <span class="mcp-sub"><button class="btn btn-default btn-sm" id="mcp-logs-refresh">Refresh</button></span>
+        </h3>
+        <div class="mcp-body" style="padding:0">
+          <pre class="mcp-log" id="mcp-log">Loading…</pre>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script type="text/javascript">
+(function () {
+    'use strict';
+
+    var URL_BASE = '/plugin?action=a&name=aapanel_mcp&s=';
+    var TIERS = [
+        { key: 'read',        label: 'Read',        blurb: 'List and inspect' },
+        { key: 'write',       label: 'Change',      blurb: 'Create and edit' },
+        { key: 'destructive', label: 'Delete',      blurb: 'Remove and stop' },
+        { key: 'shell',       label: 'Shell',       blurb: 'Run commands' },
+        { key: 'raw',         label: 'Raw',         blurb: 'Any panel call' }
+    ];
+    var root = $('#mcp-plugin');
+    var state = { status: null, config: null, tools: [], tokenVisible: false };
+
+    /* ------------------------------------------------------------ plumbing */
+
+    function api(method, data) {
+        return $.ajax({ url: URL_BASE + method, type: 'POST', data: data || {}, dataType: 'json' });
+    }
+
+    function notify(result) {
+        if (window.bt && bt.msg) { bt.msg(result); return; }
+        alert((result && result.msg) || 'Done');
+    }
+
+    function busy(message) {
+        if (window.bt && bt.load) { return bt.load(message || 'Working…'); }
+        return { close: function () {} };
+    }
+
+    function esc(value) {
+        return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();
+    }
+
+    function copy(text, label) {
+        var field = $('<textarea>').css({ position: 'fixed', top: '-1000px' }).val(text);
+        $('body').append(field);
+        field[0].select();
+        var done = false;
+        try { done = document.execCommand('copy'); } catch (err) { done = false; }
+        field.remove();
+        notify({ status: done, msg: done ? (label || 'Copied') + ' copied to the clipboard'
+                                        : 'Could not copy — select the text and copy it by hand' });
+    }
+
+    /* -------------------------------------------------------------- tabs */
+
+    root.on('click', '.bt-w-menu p', function () {
+        showTab($(this).data('tab'));
+    });
+    root.on('click', '.mcp-goto', function () {
+        showTab($(this).data('tab'));
+    });
+
+    function showTab(name) {
+        root.find('.bt-w-menu p').removeClass('bgw')
+            .filter('[data-tab="' + name + '"]').addClass('bgw');
+        root.find('.mcp-pane').removeClass('on');
+        $('#mcp-pane-' + name).addClass('on');
+        if (name === 'permissions') { loadTools(); }
+        if (name === 'audit') { loadAudit(); }
+        if (name === 'logs') { loadLogs(); }
+        if (name === 'access') { fillAccess(); }
+    }
+
+    /* ------------------------------------------------------------ overview */
+
+    function loadStatus() {
+        return api('get_status').done(function (data) {
+            state.status = data;
+            renderService(data);
+            renderBanners(data);
+            renderMeter(data.tiers, data.tool_counts);
+            $('#mcp-version').text('v' + data.version + ' · ' + data.tool_counts.total + ' tools');
+            $('#mcp-endpoint-label').text(data.endpoint);
+        });
+    }
+
+    function renderService(data) {
+        var running = data.service.running;
+        $('#mcp-service-pill').removeClass('is-on is-off').addClass(running ? 'is-on' : 'is-off');
+        $('#mcp-service-text').text(running ? 'Running' : 'Stopped');
+        $('#mcp-service-detail').text(running
+            ? 'pid ' + data.service.pid + ' · managed by ' + data.service.manager
+            : 'Nothing is listening. Agents cannot connect.');
+        $('#mcp-start').prop('disabled', running);
+        $('#mcp-stop').prop('disabled', !running);
+    }
+
+    function renderBanners(data) {
+        var box = $('#mcp-panel-banner').empty();
+        renderPanelApi(box, data.panel_api);
+        // Settings that are accepted and then quietly do nothing. Worth as much noise as
+        // an outright failure, because the symptom shows up at the client, not here.
+        (data.warnings || []).forEach(function (text) {
+            box.append($('<div class="mcp-banner warn">').append(
+                $('<b>').text('Check this setting. '),
+                document.createTextNode(text)));
+        });
+    }
+
+    function renderPanelApi(box, api_state) {
+        if (api_state.ok) { return; }
+        var banner = $('<div class="mcp-banner warn">');
+        banner.append($('<b>').text('The MCP server cannot talk to the panel yet. '));
+        banner.append(document.createTextNode(api_state.reason + ' '));
+        banner.append(document.createTextNode(api_state.remediation || ''));
+        banner.append($('<div style="margin-top:8px">').append(
+            $('<button class="btn btn-success btn-sm" id="mcp-enable-api">')
+                .text('Enable local panel API'),
+            $('<button class="btn btn-default btn-sm" id="mcp-test-api" style="margin-left:6px">')
+                .text('Test the connection')));
+        box.append(banner);
+    }
+
+    function renderMeter(tiers, counts) {
+        var meter = $('#mcp-meter').empty();
+        TIERS.forEach(function (tier) {
+            var on = !!(tiers && tiers[tier.key]);
+            $('<div class="mcp-seg">')
+                .attr('data-tier', tier.key)
+                .toggleClass('lit', on)
+                .append($('<div class="mcp-seg-name">').text(tier.label))
+                .append($('<div class="mcp-seg-state">').text(on ? tier.blurb : 'Off'))
+                .appendTo(meter);
+        });
+        $('#mcp-summary').html(summarise(tiers, counts));
+    }
+
+    /* The one sentence this page exists to produce: what the agent can and cannot do. */
+    function summarise(tiers, counts) {
+        if (!tiers) { return ''; }
+        var can = [], cannot = [];
+        (tiers.read ? can : cannot).push('read every part of this panel');
+        (tiers.write ? can : cannot).push('create and change websites, certificates, databases, mail, cron jobs and files');
+        (tiers.destructive ? can : cannot).push('delete things and stop services');
+        (tiers.shell ? can : cannot).push('run shell commands as root');
+        (tiers.raw ? can : cannot).push('call any panel endpoint directly');
+
+        function join(items) {
+            if (items.length === 1) { return items[0]; }
+            return items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
+        }
+        var parts = [];
+        if (can.length) { parts.push('An agent holding the token can <b>' + join(can) + '</b>.'); }
+        else { parts.push('No tool is enabled. An agent can connect but do nothing.'); }
+        if (cannot.length) { parts.push('It cannot ' + join(cannot) + '.'); }
+        if (counts) {
+            parts.push('<span class="mcp-desc">' + counts.enabled + ' of ' + counts.total +
+                       ' tools are visible to it.</span>');
+        }
+        return parts.join(' ');
+    }
+
+    function loadSnippets() {
+        return api('get_client_config').done(function (data) {
+            state.client = data;
+            $('#mcp-token').val(state.tokenVisible ? data.token : mask(data.token));
+            var wrap = $('#mcp-snippets').empty();
+            snippet(wrap, 'Claude Code, over HTTP', data.claude_code);
+            snippet(wrap, 'Any client that reads a JSON config', data.json);
+            snippet(wrap, 'Claude Code, over SSH — no open port needed', data.claude_code_stdio);
+            snippet(wrap, 'SSH tunnel, for the localhost-only mode', data.ssh_tunnel);
+        });
+    }
+
+    function snippet(wrap, label, text) {
+        wrap.append($('<p class="mcp-hint" style="margin:10px 0 4px">').text(label));
+        var row = $('<div class="mcp-copy">');
+        row.append($('<pre>').text(text));
+        row.append($('<button class="btn btn-default btn-sm">').text('Copy').on('click', function () {
+            copy(text, label);
+        }));
+        wrap.append(row);
+    }
+
+    function mask(token) {
+        if (!token) { return ''; }
+        return token.slice(0, 4) + '••••••••••••••••' + token.slice(-4);
+    }
+
+    root.on('click', '#mcp-reveal', function () {
+        state.tokenVisible = !state.tokenVisible;
+        $(this).text(state.tokenVisible ? 'Hide' : 'Show');
+        $('#mcp-token').val(state.tokenVisible ? state.client.token : mask(state.client.token));
+    });
+    root.on('click', '#mcp-copy-token', function () { copy(state.client.token, 'Token'); });
+
+    root.on('click', '#mcp-start, #mcp-stop, #mcp-restart', function () {
+        var action = this.id.replace('mcp-', '');
+        var load = busy(action === 'stop' ? 'Stopping…' : 'Starting…');
+        api(action).done(function (result) {
+            load.close();
+            notify(result);
+            loadStatus();
+        }).fail(function () { load.close(); notify({ status: false, msg: 'The panel did not answer.' }); });
+    });
+
+    root.on('click', '#mcp-enable-api', function () {
+        var load = busy('Enabling the panel API…');
+        api('enable_panel_api').done(function (result) {
+            load.close();
+            notify(result);
+            loadStatus();
+        });
+    });
+
+    root.on('click', '#mcp-test-api', function () {
+        var load = busy('Testing…');
+        api('test_panel_api').done(function (result) { load.close(); notify(result); });
+    });
+
+    /* -------------------------------------------------------------- access */
+
+    function fillAccess() {
+        api('get_config').done(function (config) {
+            state.config = config;
+            $('#mcp-bind-mode').val(config.bind.mode);
+            // A loopback address is what the other two modes store, and carrying it into
+            // this field makes it look like a deliberate setting. Leave it empty so the
+            // 0.0.0.0 placeholder is what the admin sees.
+            $('#mcp-host').val(isLoopback(config.bind.host) ? '' : config.bind.host);
+            $('#mcp-port').val(config.bind.port);
+            $('#mcp-path').val(config.bind.path);
+            $('#mcp-tls-mode').val(config.bind.tls.mode);
+            $('#mcp-tls-cert').val(config.bind.tls.cert);
+            $('#mcp-tls-key').val(config.bind.tls.key);
+            $('#mcp-proxy-domain').val(config.bind.proxy_domain);
+            $('#mcp-ip-allow').val((config.auth.ip_allowlist || []).join('\n'));
+            $('#mcp-origin-allow').val((config.auth.origin_allowlist || []).join('\n'));
+            $('#mcp-rate').val(config.limits.rate_per_minute);
+            syncAccessMode();
+        });
+    }
+
+    function isLoopback(host) {
+        return ['127.0.0.1', 'localhost', '::1', '[::1]'].indexOf(
+            String(host || '').trim().toLowerCase()) !== -1;
+    }
+
+    var MODE_HELP = {
+        localhost: 'The endpoint is bound to 127.0.0.1 and nothing outside this machine can reach it. Connect through an SSH tunnel — the command is on the Overview tab. Nothing to open in the firewall.',
+        bound: 'The endpoint listens on a network port. Open that port in the firewall, and use a certificate: without one the access token crosses the network in clear text.',
+        proxy: 'The endpoint stays on 127.0.0.1 and an aaPanel site forwards to it, so it can use a real certificate from the panel. Create the site below, then issue a certificate for it under Website → SSL.'
+    };
+
+    function syncAccessMode() {
+        var mode = $('#mcp-bind-mode').val();
+        $('#mcp-bind-help').text(MODE_HELP[mode]);
+        $('#mcp-row-host').toggle(mode === 'bound');
+        $('#mcp-row-tls').toggle(mode === 'bound');
+        $('#mcp-row-proxy').toggle(mode === 'proxy');
+        root.find('.mcp-tls-custom').toggle(mode === 'bound' && $('#mcp-tls-mode').val() === 'custom');
+        $('#mcp-open-fw, #mcp-close-fw').prop('disabled', mode !== 'bound');
+    }
+
+    root.on('change', '#mcp-bind-mode, #mcp-tls-mode', syncAccessMode);
+
+    function lines(selector) {
+        return $(selector).val().split('\n').map(function (line) { return line.trim(); })
+            .filter(function (line) { return line.length > 0; });
+    }
+
+    root.on('click', '#mcp-save-access', function () {
+        var payload = {
+            bind: {
+                mode: $('#mcp-bind-mode').val(),
+                // Blank means the placeholder: every interface when a network port was
+                // asked for, this machine only otherwise.
+                host: $('#mcp-host').val().trim() ||
+                    ($('#mcp-bind-mode').val() === 'bound' ? '0.0.0.0' : '127.0.0.1'),
+                port: parseInt($('#mcp-port').val(), 10),
+                path: $('#mcp-path').val().trim() || '/mcp',
+                tls: {
+                    mode: $('#mcp-bind-mode').val() === 'bound' ? $('#mcp-tls-mode').val() : 'off',
+                    cert: $('#mcp-tls-cert').val().trim(),
+                    key: $('#mcp-tls-key').val().trim()
+                }
+            },
+            auth: {
+                ip_allowlist: lines('#mcp-ip-allow'),
+                origin_allowlist: lines('#mcp-origin-allow')
+            },
+            limits: { rate_per_minute: parseInt($('#mcp-rate').val(), 10) || 0 }
+        };
+        var load = busy('Saving…');
+        api('save_config', { data: JSON.stringify(payload) }).done(function (result) {
+            load.close();
+            notify(result);
+            if (result.status) { loadStatus(); loadSnippets(); }
+        });
+    });
+
+    root.on('click', '#mcp-new-token', function () {
+        confirmThen('Generate a new token?',
+            'Every client using the current token stops working until you give it the new one.',
+            function () {
+                api('regenerate_token').done(function (result) {
+                    notify(result);
+                    state.tokenVisible = false;
+                    $('#mcp-reveal').text('Show');
+                    loadSnippets();
+                });
+            });
+    });
+
+    root.on('click', '#mcp-open-fw', function () {
+        api('open_firewall').done(notify);
+    });
+    root.on('click', '#mcp-close-fw', function () {
+        api('close_firewall').done(notify);
+    });
+
+    root.on('click', '#mcp-setup-proxy', function () {
+        var domain = $('#mcp-proxy-domain').val().trim();
+        if (!domain) { notify({ status: false, msg: 'Enter the domain first.' }); return; }
+        var load = busy('Creating the site…');
+        api('setup_proxy_site', { domain: domain }).done(function (result) {
+            load.close();
+            notify(result);
+            if (result.status) { fillAccess(); loadStatus(); loadSnippets(); }
+        });
+    });
+
+    function confirmThen(title, message, action) {
+        if (window.bt && bt.confirm) { bt.confirm({ title: title, msg: message }, action); return; }
+        if (confirm(title + '\n\n' + message)) { action(); }
+    }
+
+    /* --------------------------------------------------------- permissions */
+
+    function loadTools() {
+        api('get_tools').done(function (data) {
+            state.tools = data.tools;
+            renderTiers(data.tiers);
+            renderTools();
+        });
+    }
+
+    function renderTiers(tiers) {
+        var box = $('#mcp-tiers').empty();
+        TIERS.forEach(function (tier) {
+            var on = !!tiers[tier.key];
+            var row = $('<div class="mcp-row">');
+            row.append($('<span class="mcp-tier" style="flex:0 0 auto">')
+                .attr('data-tier', tier.key).text(tier.label));
+            row.append($('<label class="mcp-switch">').append(
+                $('<input type="checkbox">').prop('checked', on).attr('data-tier', tier.key),
+                $('<span>').text(on ? 'Enabled' : 'Disabled')));
+            row.append($('<span class="mcp-hint mcp-grow">').text(TIER_HELP[tier.key]));
+            box.append(row);
+        });
+    }
+
+    var TIER_HELP = {
+        read: 'Listing and inspecting. Safe to leave on.',
+        write: 'Creating sites, databases, mailboxes, cron jobs; editing files and configuration.',
+        destructive: 'Deleting sites, databases and files; stopping services; rebooting. Needs confirmation per call.',
+        shell: 'Arbitrary commands as root. This is full control of the machine. Needs confirmation per call.',
+        raw: 'Direct calls to any panel endpoint or plugin, bypassing the per-tool schemas.'
+    };
+
+    root.on('change', '#mcp-tiers input[type=checkbox]', function () {
+        var box = this;
+        var tier = $(box).data('tier');
+        var enabled = box.checked ? 1 : 0;
+        var apply = function () {
+            api('set_tier', { tier: tier, enabled: enabled }).done(function (result) {
+                notify(result);
+                loadTools();
+                loadStatus();
+            });
+        };
+        if (!enabled || ['destructive', 'shell', 'raw'].indexOf(tier) === -1) {
+            apply();
+            return;
+        }
+        // Widening access asks first, and the switch snaps back if you decline.
+        box.checked = false;
+        $(box).next('span').text('Disabled');
+        confirmThen('Enable the ' + tier + ' tier?', TIER_HELP[tier], apply);
+    });
+
+    $('#mcp-tool-search').on('input', renderTools);
+
+    function renderTools() {
+        var needle = ($('#mcp-tool-search').val() || '').toLowerCase();
+        var body = $('#mcp-tools tbody').empty();
+        var shown = 0, domain = null;
+        state.tools.forEach(function (tool) {
+            if (needle && tool.name.indexOf(needle) === -1 &&
+                tool.title.toLowerCase().indexOf(needle) === -1 &&
+                tool.domain.indexOf(needle) === -1) { return; }
+            if (tool.domain !== domain) {
+                domain = tool.domain;
+                body.append($('<tr class="mcp-domain">').append(
+                    $('<td colspan="4">').text(domain)));
+            }
+            shown += 1;
+            var override = tool.override;
+            var select = $('<select style="width:110px">')
+                .attr('data-tool', tool.name)
+                .append($('<option value="default">').text('Tier default'))
+                .append($('<option value="1">').text('Always on'))
+                .append($('<option value="0">').text('Always off'));
+            select.val(override === null || override === undefined ? 'default' : (override ? '1' : '0'));
+
+            var status = $('<span class="mcp-pill">')
+                .addClass(tool.enabled && tool.available ? 'is-on' : 'is-off')
+                .append($('<span class="mcp-dot">'))
+                .append($('<span>').text(!tool.available ? 'Not installed'
+                                                         : (tool.enabled ? 'Visible' : 'Hidden')));
+
+            body.append($('<tr>')
+                .append($('<td class="mcp-mono">').text(tool.name))
+                .append($('<td class="mcp-desc">').text(tool.description))
+                .append($('<td>').append($('<span class="mcp-tier">')
+                    .attr('data-tier', tool.tier).text(tool.tier)))
+                .append($('<td>').append(status, $('<div style="margin-top:4px">').append(select))));
+        });
+        if (!shown) {
+            body.append($('<tr>').append($('<td colspan="4" class="mcp-empty">')
+                .text('No tool matches that filter.')));
+        }
+    }
+
+    root.on('change', '#mcp-tools select', function () {
+        api('set_tool', { tool: $(this).data('tool'), state: $(this).val() })
+            .done(function (result) { notify(result); loadTools(); loadStatus(); });
+    });
+
+    root.on('click', '.mcp-preset', function () {
+        var preset = $(this).data('preset');
+        var apply = function () {
+            api('apply_preset', { preset: preset }).done(function (result) {
+                notify(result); loadTools(); loadStatus();
+            });
+        };
+        if (preset === 'full') {
+            confirmThen('Give the agent everything?',
+                'Shell and raw access mean an agent holding the token can do anything on this server, including deleting data and reconfiguring the panel.',
+                apply);
+        } else { apply(); }
+    });
+
+    /* --------------------------------------------------------------- audit */
+
+    function loadAudit() {
+        api('get_audit', { limit: 300, search: $('#mcp-audit-search').val() || '' })
+            .done(function (data) {
+                var body = $('#mcp-audit tbody').empty();
+                if (!data.entries.length) {
+                    body.append($('<tr>').append($('<td colspan="6" class="mcp-empty">')
+                        .text('No tool has been called yet.')));
+                    return;
+                }
+                data.entries.forEach(function (entry) {
+                    var args = entry.arguments ? JSON.stringify(entry.arguments) : '';
+                    body.append($('<tr>')
+                        .append($('<td class="mcp-mono">').text(entry.time || ''))
+                        .append($('<td class="mcp-mono">').text(entry.tool || ''))
+                        .append($('<td>').append(entry.tier
+                            ? $('<span class="mcp-tier">').attr('data-tier', entry.tier).text(entry.tier)
+                            : ''))
+                        .append($('<td>').append(outcomePill(entry.outcome))
+                            .append($('<div class="mcp-desc">').text(
+                                entry.duration_ms !== undefined ? entry.duration_ms + ' ms' : '')))
+                        .append($('<td class="mcp-mono mcp-desc">')
+                            .attr('title', entry.detail || '').text(args.slice(0, 160)))
+                        .append($('<td class="mcp-desc">').text(
+                            (entry.client || '') + (entry.peer ? ' · ' + entry.peer : ''))));
+                });
+            });
+    }
+
+    function outcomePill(outcome) {
+        var bad = ['error', 'exception', 'panel_error'].indexOf(outcome) !== -1;
+        var pending = ['denied', 'needs_confirmation'].indexOf(outcome) !== -1;
+        return $('<span class="mcp-pill">')
+            .addClass(bad ? 'is-bad' : (pending ? 'is-off' : 'is-on'))
+            .append($('<span class="mcp-dot">'))
+            .append($('<span>').text(outcome || ''));
+    }
+
+    root.on('click', '#mcp-audit-refresh', loadAudit);
+    $('#mcp-audit-search').on('keyup', function (event) { if (event.keyCode === 13) { loadAudit(); } });
+    root.on('click', '#mcp-audit-clear', function () {
+        confirmThen('Clear the audit log?', 'The record of past tool calls is deleted permanently.',
+            function () { api('clear_audit').done(function (result) { notify(result); loadAudit(); }); });
+    });
+
+    /* ---------------------------------------------------------------- logs */
+
+    function loadLogs() {
+        api('get_logs', { lines: 300 }).done(function (data) {
+            $('#mcp-log').text(data.log || 'The log is empty.');
+        });
+    }
+    root.on('click', '#mcp-logs-refresh', loadLogs);
+
+    /* ---------------------------------------------------------------- boot */
+
+    loadStatus();
+    loadSnippets();
+})();
+</script>
+</div>

@@ -1,0 +1,67 @@
+#!/www/server/panel/pyenv/bin/python3
+# coding: utf-8
+"""HTTP entry point for the aaPanel MCP server.
+
+Run in the foreground; the systemd unit (or the SysV script) owns the lifecycle.
+The interpreter above is the panel's own; install.sh rewrites it if that path is
+missing on this machine.
+
+    aapanel_mcp_service [--check]
+
+    --check   validate the config and the panel connection, then exit
+"""
+
+import os
+import signal
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from mcpd import app as mcp_app                      # noqa: E402
+from mcpd import config as cfg                       # noqa: E402
+from mcpd.http_transport import HttpApp              # noqa: E402
+
+
+def main(argv):
+    logger = mcp_app.Logger(cfg.daemon_log_path(), cfg.load()['log_level'])
+    provider, server = mcp_app.build(logger)
+    config = provider()
+
+    if '--check' in argv:
+        state = server.panel.status()
+        print('tools:  %d' % len(server.registry))
+        print('bind:   %s:%s%s' % (config['bind']['host'], config['bind']['port'],
+                                   config['bind']['path']))
+        print('panel:  %s' % ('ok' if state['ok'] else state['reason']))
+        return 0 if state['ok'] else 1
+
+    http = HttpApp(provider, server, logger)
+
+    def shutdown(signum, frame):
+        logger('stop', 'signal %s received' % signum)
+        http.stop()
+
+    signal.signal(signal.SIGTERM, shutdown)
+    signal.signal(signal.SIGINT, shutdown)
+
+    try:
+        with open(cfg.pid_path(), 'w', encoding='utf-8') as fp:
+            fp.write(str(os.getpid()))
+    except OSError:
+        pass
+
+    try:
+        http.serve_forever()
+    except Exception as exc:
+        logger('error', 'server stopped: %s' % exc)
+        return 1
+    finally:
+        try:
+            os.remove(cfg.pid_path())
+        except OSError:
+            pass
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
