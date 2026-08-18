@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "aapanel": {
+      "type": "http",
+      "url": "${AAPANEL_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${AAPANEL_MCP_TOKEN}"
+      }
+    }
+  }
+}

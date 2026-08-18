@@ -1,0 +1,14 @@
+{
+  "name": "aapanel-mcp",
+  "owner": {
+    "name": "Azril Aiman",
+    "url": "https://github.com/azrilaiman2003"
+  },
+  "plugins": [
+    {
+      "name": "aapanel-mcp",
+      "source": "./",
+      "description": "aaPanel MCP server connection plus workflow skills for multi-tool server jobs."
+    }
+  ]
+}

@@ -108,6 +108,33 @@ claude mcp add aapanel -- ssh root@server \
   /www/server/panel/plugin/aapanel_mcp/bin/aapanel-mcp-stdio
 ```
 
+## Use with Claude Code
+
+This repository is also a Claude Code plugin. Installing it registers the MCP server and
+adds skills for the jobs that span several tools and that no single tool description can
+describe on its own.
+
+```bash
+/plugin marketplace add azrilaiman2003/aapanel-mcp
+/plugin install aapanel-mcp@aapanel-mcp
+```
+
+The server entry reads two environment variables, which must be set before Claude Code
+starts or the connection fails:
+
+```bash
+export AAPANEL_MCP_URL=https://your-server:7801/mcp
+export AAPANEL_MCP_TOKEN=<the token from the Access tab>
+```
+
+Prefer no open port? Skip the plugin's server entry and add the stdio one by hand, as
+under Exposure above; the skills work against either.
+
+| Skill | Covers |
+|---|---|
+| `aapanel-deploy-site` | Putting a site on the server: document root, rewrite rules and the reload they need, reverse proxies, database, certificate, forced HTTPS |
+| `aapanel-release-app` | Shipping a new version to a site that exists: batching shell calls against the confirmation cost, exit status, waiting for the backup, migrations, file ownership after a root build |
+
 ## Protocol
 
 Dual-era, on one endpoint. It speaks **2026-07-28** — stateless, per-request `_meta`,

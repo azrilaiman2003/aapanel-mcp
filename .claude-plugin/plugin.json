@@ -1,0 +1,13 @@
+{
+  "name": "aapanel-mcp",
+  "description": "Connects Claude Code to an aaPanel server and adds workflow skills for the multi-step jobs the tools do not describe on their own.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Azril Aiman",
+    "url": "https://github.com/azrilaiman2003"
+  },
+  "homepage": "https://github.com/azrilaiman2003/aapanel-mcp",
+  "repository": "https://github.com/azrilaiman2003/aapanel-mcp",
+  "license": "MIT",
+  "keywords": ["aapanel", "mcp", "hosting", "nginx", "letsencrypt", "deployment"]
+}
